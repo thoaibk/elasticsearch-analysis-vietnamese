@@ -22,26 +22,26 @@ services:
       # --- Performance Tuning ---
       # Lock RAM, tránh ES bị swap ra disk
       # Swap gây GC pause hàng giây → search timeout, cluster crash
-      bootstrap.memory_lock=true
+      bootstrap.memory_lock: "true"
 
       # Buffer cho indexing: 20% heap = ~2.4GB
       # Tăng throughput khi import hàng loạt (scout:import)
-      indices.memory.index_buffer_size=20%
+      indices.memory.index_buffer_size: "20%"
 
       # Giới hạn số shard trên node
       # 1000 shard là đủ cho Gitiho ở quy mô hiện tại
-      cluster.max_shards_per_node=1000
+      cluster.max_shards_per_node: "1000"
 
       # Thread pool cho search requests
       # Default = số CPU cores, phù hợp với hầu hết trường hợp
       # Uncomment và điều chỉnh nếu server có ít core (< 4)
-      # - thread_pool.search.size=4
-      # - thread_pool.search.queue_size=1000
+      # - thread_pool.search.size: 4
+      # - thread_pool.search.queue_size: 1000
 
       # --- Logging ---
       # WARN để tránh log spam trong production
       # Chuyển sang INFO khi cần debug
-      logger.level=WARN
+      logger.level: "WARN"
     ulimits:
       # Bắt buộc để bootstrap.memory_lock=true hoạt động
       memlock:
