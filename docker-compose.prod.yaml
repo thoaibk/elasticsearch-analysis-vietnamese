@@ -1,0 +1,97 @@
+services:
+  elasticsearch:
+    container_name: es-vi-prod
+    build:
+      context: .
+      args:
+        ES_VERSION: ${ES_VERSION}
+    image: elasticsearch-vietnamese
+    restart: unless-stopped
+
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./data:/usr/share/elasticsearch/data
+    environment:
+      ES_JAVA_OPTS: "-Xmx4g -Xms4g"
+      ELASTIC_USERNAME: "elastic"
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      # --- Security (xpack) ---
+      # Bật authentication để có lớp bảo vệ thứ 2 sau firewall
+      # Nếu firewall bị misconfigure, ES vẫn yêu cầu username/password
+      # --- Performance Tuning ---
+      # Lock RAM, tránh ES bị swap ra disk
+      # Swap gây GC pause hàng giây → search timeout, cluster crash
+      bootstrap.memory_lock=true
+
+      # Buffer cho indexing: 20% heap = ~2.4GB
+      # Tăng throughput khi import hàng loạt (scout:import)
+      indices.memory.index_buffer_size=20%
+
+      # Giới hạn số shard trên node
+      # 1000 shard là đủ cho Gitiho ở quy mô hiện tại
+      cluster.max_shards_per_node=1000
+
+      # Thread pool cho search requests
+      # Default = số CPU cores, phù hợp với hầu hết trường hợp
+      # Uncomment và điều chỉnh nếu server có ít core (< 4)
+      # - thread_pool.search.size=4
+      # - thread_pool.search.queue_size=1000
+
+      # --- Logging ---
+      # WARN để tránh log spam trong production
+      # Chuyển sang INFO khi cần debug
+      logger.level=WARN
+    ulimits:
+      # Bắt buộc để bootstrap.memory_lock=true hoạt động
+      memlock:
+        soft: -1
+        hard: -1
+      # ES mở rất nhiều file (Lucene segments, network sockets)
+      # Default Linux 1024 không đủ, ES khuyến nghị 65536
+      nofile:
+        soft: 65536
+        hard: 65536
+      # Tắt core dump trong production (tránh dump 12GB heap ra disk)
+      core:
+        soft: 0
+        hard: 0
+
+    # Heap 6GB + Lucene off-heap 5GB + JVM overhead ~1GB = ~12GB
+    # Hard limit bảo vệ MySQL và FastAPI: nếu ES vượt quá → kill container ES,
+    # không làm crash toàn server
+    deploy:
+      resources:
+        limits:
+          memory: 12G
+        reservations:
+          memory: 7G
+
+    healthcheck:
+      # Dùng elastic user vì đã bật xpack.security
+      # Kiểm tra cluster status là green hoặc yellow
+      # Yellow = single node bình thường (replica shard chưa assign)
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # ES với 8GB heap khởi động nhanh hơn 12GB, 60s là đủ
+      start_period: 60s
+
+    # Giới hạn log container tránh đầy disk
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+    networks:
+      - elastic
+
+networks:
+  elastic:
+    driver: bridge
