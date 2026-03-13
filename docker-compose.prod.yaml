@@ -18,9 +18,17 @@ services:
       ES_JAVA_OPTS: "-Xmx4g -Xms4g"
       ELASTIC_USERNAME: "elastic"
       ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      # --- Cluster ---
+      # Bắt buộc cho single-node: không có thì ES chờ bootstrap cluster
+      # với các node khác → treo vô thời hạn, không bao giờ sẵn sàng
+      discovery.type: "single-node"
+
       # --- Security (xpack) ---
+      # ES 8.x bật security mặc định, explicit để rõ ràng
       # Bật authentication để có lớp bảo vệ thứ 2 sau firewall
       # Nếu firewall bị misconfigure, ES vẫn yêu cầu username/password
+      xpack.security.enabled: "true"
+
       # --- Performance Tuning ---
       # Lock RAM, tránh ES bị swap ra disk
       # Swap gây GC pause hàng giây → search timeout, cluster crash
